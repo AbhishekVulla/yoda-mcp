@@ -38,3 +38,22 @@ def book_meal(date: str, meal_type: str = "lunch") -> dict:
             f"Reference {ref}. A volunteer will call to confirm."
         ),
     }
+
+
+def book_activity(event_name: str, location: str, date: str, time: str,
+                  senior_id: str = "mdm-tan") -> dict:
+    ref = _ref("ACT")
+    # REAL (future): httpx.post(AAC_BOOKING_API, json={...}).json()
+    return {
+        "status": "confirmed",
+        "service": "Active Ageing Centre",
+        "reference": ref,
+        "event": event_name,
+        "location": location,
+        "date": date,
+        "time": time,
+        "message": (
+            f"You're booked for {event_name} at {location} on {date}, {time}. "
+            f"Reference {ref}. We'll send a reminder the day before."
+        ),
+    }
