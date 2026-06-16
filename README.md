@@ -30,7 +30,7 @@ flowchart LR
   Pendant -->|audio · WebSocket| Cloud[xiaozhi.me cloud<br/>ASR · DeepSeek · TTS]
   Cloud <-->|MCP tool calls · wss| Server[yoda-mcp server<br/>· this repo ·]
   Server --> Tools{{ICCP tools}}
-  Tools --> KB[(Knowledge Base<br/>mdm-tan.json)]
+  Tools --> KB[(Knowledge Base<br/>Neon Postgres)]
   Tools --> Mock[mock provider adapter<br/>→ real APIs later]
   Baseline[interRAI baseline<br/>· Abel ·] -. seeds .-> KB
 ```
@@ -89,8 +89,13 @@ The senior's profile (`data/profiles/<id>.json`) is **one shared file**. Abel's 
 seeds the clinical/functional baseline; this server reads it for context and **appends** preferences +
 bookings under `yoda_profile`. Don't fork a second format.
 
-Storage is a local file by default (bulletproof for a live demo). Set `KB_BACKEND=supabase` to flip to
-Supabase Storage once a `senior-profiles` bucket exists — the seam is in `kb_store.py`.
+Storage backends (set `KB_BACKEND` in `.env`):
+- **`neon`** — Neon Postgres, a `profiles(senior_id text pk, data jsonb)` upsert. This is the shared DB
+  Abel's onboarding also writes to. Needs `DATABASE_URL` in `.env`.
+- **`local`** (default) — a JSON file under `data/profiles/`. Bulletproof, offline — a safe fallback
+  if venue WiFi dies mid-demo.
+
+The seam is in `kb_store.py` (one `_neon_load` / `_neon_save` pair).
 
 ## Tests
 
