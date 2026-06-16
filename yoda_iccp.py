@@ -19,6 +19,7 @@ import services
 import events as events_mod
 import onboarding as onboarding_mod
 import kb_store
+import requests_db
 
 # Windows console UTF-8 (xiaozhi pipes via stdio)
 if sys.platform == "win32":
@@ -98,40 +99,48 @@ def match_events(preferences: dict) -> list:
 
 
 @mcp.tool()
-def book_aac_activity(event_name: str, location: str, date: str, time: str,
-                      senior_id: str = "mdm-tan") -> dict:
-    """Book a community activity for the senior and return a confirmation to read back.
+def request_activity(event_name: str, location: str, date: str, time: str,
+                     senior_id: str = "mdm-tan") -> dict:
+    """Send a REQUEST to the senior's caregiver to sign her up for a community activity.
 
-    Use this after she picks one of the matched events. Then call update_knowledge_base
-    so the booking is saved to her profile.
+    Use this ONLY after she clearly says she is interested in a specific event you offered.
+    This does NOT book anything — it creates a request for her caregiver to approve. Tell her
+    warmly that you'll ask her caregiver to arrange it. Do NOT say it is booked or confirmed —
+    a human makes that decision.
     """
-    result = services.book_activity(event_name, location, date, time, senior_id)
-    logger.info(f"[ICCP] book_aac_activity({event_name} @ {location}) -> {result['reference']}")
-    return result
+    profile = kb_store.load_profile(senior_id)
+    caregiver = (profile.get("section_p_caregiver", {})
+                 .get("primary_caregiver", {}).get("name"))
+    who = caregiver.split()[0] if caregiver else "your caregiver"
+    event = {"name": event_name, "location": location, "date": date, "time": time}
+    rid = requests_db.create_request(senior_id, event)
+    logger.info(f"[ICCP] request_activity({event_name} @ {location}) -> request #{rid}")
+    return {
+        "status": "requested",
+        "request_id": rid,
+        "event": event,
+        "message": (
+            f"I'll ask {who} to set up {event_name} on {date}. "
+            f"They'll confirm it with you soon."
+        ),
+    }
 
 
 @mcp.tool()
-def update_knowledge_base(senior_id: str = "mdm-tan", preferences: dict = None,
-                          booked_activity: dict = None) -> dict:
-    """Save what you learned this conversation into the senior's knowledge base.
+def update_knowledge_base(senior_id: str = "mdm-tan", preferences: dict = None) -> dict:
+    """Save preferences you learned this conversation into the senior's knowledge base.
 
-    Merges any new `preferences` into her fitness_preferences and appends a
-    `booked_activity` to her booked list. Call at the end of onboarding / after a booking.
+    Merges new `preferences` into her fitness_preferences. (Bookings are NOT saved here —
+    they go through the caregiver's approval of a request.)
     """
     profile = kb_store.load_profile(senior_id)
     yp = profile.setdefault("yoda_profile", {})
     if preferences:
         fp = yp.get("fitness_preferences", {})
         yp["fitness_preferences"] = kb_store.deep_merge(fp, preferences)
-    if booked_activity:
-        yp.setdefault("booked_activities", []).append(booked_activity)
-    saved = kb_store.save_profile(senior_id, profile)
-    logger.info(f"[ICCP] update_knowledge_base({senior_id}) booked={bool(booked_activity)}")
-    return {
-        "status": "saved",
-        "senior_id": senior_id,
-        "booked_activities": saved.get("yoda_profile", {}).get("booked_activities", []),
-    }
+    kb_store.save_profile(senior_id, profile)
+    logger.info(f"[ICCP] update_knowledge_base({senior_id})")
+    return {"status": "saved", "senior_id": senior_id}
 
 
 if __name__ == "__main__":
