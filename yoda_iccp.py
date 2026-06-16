@@ -85,16 +85,22 @@ def get_onboarding_questions() -> list:
 
 
 @mcp.tool()
-def match_events(preferences: dict) -> list:
+def match_events(preferences: dict, senior_id: str = "mdm-tan") -> list:
     """Find the best 1-2 upcoming community activities for a senior.
 
     Pass her preferences as a dict — reuse what's already in her profile
     (goals, preferred_day, preferred_location, new_to_fitness, open_to_volunteering)
-    and merge in anything she just told you. Returns events with name/location/date/time
-    to offer her. Speak the top one back warmly.
+    and merge in anything she just told you. Events she has ALREADY been offered (already
+    in a request) are excluded, so you never suggest the same thing twice. Returns events
+    with name/location/date/time to offer her. Speak the top one back warmly.
     """
-    matches = events_mod.match_events(preferences)
-    logger.info(f"[ICCP] match_events -> {[m['name'] for m in matches]}")
+    matches = events_mod.match_events(preferences, limit=8)
+    try:
+        already = {r["event"].get("name") for r in requests_db.list_requests(senior_id)}
+    except Exception:
+        already = set()
+    matches = [m for m in matches if m["name"] not in already][:2]
+    logger.info(f"[ICCP] match_events -> {[m['name'] for m in matches]} (excluded {len(already)} requested)")
     return matches
 
 
