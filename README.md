@@ -5,10 +5,13 @@ Yoda has **two sides**, and this is the monorepo for both:
 - **The necklace** — a senior just *talks*. Yoda asks one short question at a time, already knows her
   (from her interRAI profile), and **requests** help on her behalf.
 - **The caregiver dashboard** — a human (her caregiver, "Linda") sees Yoda's requests and **approves or
-  declines** them. *AI is the interface; a human makes the decision.*
+  declines** them, and can run a **welfare check** — ping the senior or view the camera on demand (with a
+  spoken privacy announce first). *AI is the interface; a human makes the decision.*
 
-The pendant runs unchanged stock firmware; the AI brain is hosted DeepSeek on `xiaozhi.me`. This repo
-adds the **tools** that brain can call (an MCP server) and the **dashboard** the caregiver controls.
+The pendant runs **our own firmware** — a custom [`xiaozhi-esp32`](https://github.com/78/xiaozhi-esp32)
+board (see [`firmware/`](firmware/)); the AI brain is hosted DeepSeek on `xiaozhi.me`. This repo holds all
+**three parts**: the **firmware**, the **MCP server** (tools the brain can call), and the **dashboard** the
+caregiver controls.
 
 ## The problem
 
@@ -28,17 +31,21 @@ intake forms. The seniors who need them most struggle with apps. Yoda turns a 20
 
 ```mermaid
 flowchart LR
-  Senior([Senior]) -->|voice| Pendant[Yoda necklace<br/>XIAO ESP32-S3]
+  Senior([Senior]) -->|voice| Pendant[Yoda necklace<br/>XIAO ESP32-S3<br/>· firmware/ ·]
   Pendant -->|audio · wss| Cloud[xiaozhi.me cloud<br/>ASR · DeepSeek · TTS]
   Cloud <-->|MCP tool calls| Server[MCP server<br/>· repo root ·]
   Server --> Neon[(Neon Postgres<br/>profiles + requests)]
   Caregiver([Caregiver]) --> Dash[Care dashboard<br/>· dashboard/ ·]
   Dash <-->|read profile + requests<br/>approve / decline| Neon
+  Dash -.->|welfare check · LAN HTTP<br/>ping · camera · MJPEG| Pendant
   Baseline[interRAI baseline · Abel] -. seeds .-> Neon
 ```
 
-The pendant never knows the tools exist — the **cloud LLM** calls them. The **dashboard** and the MCP
-server never talk to each other directly; they meet at the shared **Neon** database.
+Two paths reach the senior. **Voice (Feature 1)** goes necklace → cloud LLM → MCP tools → Neon; the pendant
+never knows the tools exist. **Welfare check (Feature 2)** is the dashed line: the dashboard talks to the
+necklace *directly over the LAN* (HTTP), bypassing the cloud, so the caregiver can ping or view the camera
+on demand. The dashboard and MCP server never talk to each other directly — they meet at the shared **Neon**
+database.
 
 ## Repo structure (monorepo)
 
@@ -57,9 +64,19 @@ yoda-mcp/                        ← repo root: the MCP server (Python)
 ├── requirements.txt
 ├── .env                         # MCP_ENDPOINT + DATABASE_URL — gitignored, never committed
 │
+├── firmware/                    ← the necklace firmware (overlay onto xiaozhi-esp32)
+│   ├── yoda-pendant/             # our board: config.h, config.json, yoda_pendant_board.cc
+│   │                            #   voice stack + LAN welfare HTTP API (/ping /camera /stream)
+│   ├── assets/                   # door.ogg ("at the door") + checking.ogg (privacy announce)
+│   ├── patches/                  # diffs for the upstream files we touched (camera, board reg)
+│   ├── scripts/                  # build / flash / serial helpers (Windows)
+│   ├── apply-overlay.ps1         # drop the overlay onto a clean xiaozhi-esp32 checkout
+│   └── README.md                 # hardware + build-from-scratch + HTTP API
+│
 └── dashboard/                   ← the Next.js caregiver dashboard
     ├── app/
     │   ├── care-dashboard.tsx    # the live UI (SWR polls every 3s)
+    │   ├── welfare/welfare-panel.tsx  # Feature 2: ping + camera arm + live MJPEG stream
     │   ├── page.tsx · layout.tsx · globals.css
     │   └── api/
     │       ├── profile/route.ts  # GET profile + requests (live)
