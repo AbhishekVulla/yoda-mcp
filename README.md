@@ -7,6 +7,9 @@ Yoda has **two sides**, and this is the monorepo for both:
 - **The caregiver dashboard** — a human (her caregiver, "Linda") sees Yoda's requests and **approves or
   declines** them, and can run a **welfare check** — ping the senior or view the camera on demand (with a
   spoken privacy announce first). *AI is the interface; a human makes the decision.*
+- **When she's unwell** — Yoda runs a short health **triage** and escalates to the dashboard (mild → urgent
+  → **emergency** if she stops responding), where an **AI clinical report** fuses the episode with her
+  interRAI record into an SBAR handover the caregiver can act on or hand to paramedics.
 
 The pendant runs **our own firmware** — a custom [`xiaozhi-esp32`](https://github.com/78/xiaozhi-esp32)
 board (see [`firmware/`](firmware/)); the AI brain is hosted DeepSeek on `xiaozhi.me`. This repo holds all
@@ -34,18 +37,20 @@ flowchart LR
   Senior([Senior]) -->|voice| Pendant[Yoda necklace<br/>XIAO ESP32-S3<br/>· firmware/ ·]
   Pendant -->|audio · wss| Cloud[xiaozhi.me cloud<br/>ASR · DeepSeek · TTS]
   Cloud <-->|MCP tool calls| Server[MCP server<br/>· repo root ·]
-  Server --> Neon[(Neon Postgres<br/>profiles + requests)]
+  Server --> Neon[(Neon Postgres<br/>profiles · requests · health_incidents)]
   Caregiver([Caregiver]) --> Dash[Care dashboard<br/>· dashboard/ ·]
-  Dash <-->|read profile + requests<br/>approve / decline| Neon
+  Dash <-->|profile · requests · alerts<br/>approve / decline / resolve| Neon
+  Dash -->|synthesize SBAR report| LLM[OpenAI<br/>clinical handover]
   Dash -.->|welfare check · LAN HTTP<br/>ping · camera · MJPEG| Pendant
   Baseline[interRAI baseline · Abel] -. seeds .-> Neon
 ```
 
-Two paths reach the senior. **Voice (Feature 1)** goes necklace → cloud LLM → MCP tools → Neon; the pendant
-never knows the tools exist. **Welfare check (Feature 2)** is the dashed line: the dashboard talks to the
-necklace *directly over the LAN* (HTTP), bypassing the cloud, so the caregiver can ping or view the camera
-on demand. The dashboard and MCP server never talk to each other directly — they meet at the shared **Neon**
-database.
+Three paths reach the senior. **Voice (Features 1 & 3)** goes necklace → cloud LLM → MCP tools → Neon; the
+pendant never knows the tools exist. The same path carries a **health triage** — if she's unwell, Yoda logs
+an incident that escalates on the dashboard, and the dashboard calls **OpenAI** to synthesize an SBAR
+clinical report from the incident + her interRAI record. **Welfare check (Feature 2)** is the dashed line:
+the dashboard talks to the necklace *directly over the LAN* (HTTP), bypassing the cloud. The dashboard and
+MCP server never talk to each other directly — they meet at the shared **Neon** database.
 
 ## Repo structure (monorepo)
 
@@ -57,10 +62,11 @@ yoda-mcp/                        ← repo root: the MCP server (Python)
 ├── onboarding.py                # short onboarding questions
 ├── kb_store.py                  # profile load + deep-merge save (Neon / local file)
 ├── requests_db.py               # activity requests: create / list / decide (Neon)
+├── health_db.py                 # health incidents: triage + no-response emergency watchdog (Neon)
 ├── mcp_pipe.py                  # connects the server OUT to the xiaozhi MCP endpoint
-├── SYSTEM_PROMPT.md             # the Yoda agent prompt — paste into xiaozhi.me
+├── SYSTEM_PROMPT.md             # the Yoda agent prompt (activities + health triage) — paste into xiaozhi.me
 ├── data/profiles/mdm-tan.json   # demo senior KB seed (local-backend fallback)
-├── test_match.py · test_services.py
+├── test_match.py · test_services.py · test_health.py
 ├── requirements.txt
 ├── .env                         # MCP_ENDPOINT + DATABASE_URL — gitignored, never committed
 │
@@ -75,15 +81,20 @@ yoda-mcp/                        ← repo root: the MCP server (Python)
 │
 └── dashboard/                   ← the Next.js caregiver dashboard
     ├── app/
-    │   ├── care-dashboard.tsx    # the live UI (SWR polls every 3s)
-    │   ├── welfare/welfare-panel.tsx  # Feature 2: ping + camera arm + live MJPEG stream
+    │   ├── care-dashboard.tsx    # the live UI (SWR polls every 3s); mounts the health alerts
+    │   ├── components/alerts-panel.tsx  # Feature 3: health alerts + inline AI report summary
+    │   ├── welfare/welfare-panel.tsx     # Feature 2: ping + camera arm + live MJPEG stream
+    │   ├── report/[id]/          # Feature 3.5: printable SBAR handover page (+ Copy / Print)
     │   ├── page.tsx · layout.tsx · globals.css
     │   └── api/
-    │       ├── profile/route.ts  # GET profile + requests (live)
-    │       └── requests/route.ts # POST approve / decline
-    ├── lib/db.ts                 # Neon queries: profile, requests, decideRequest
+    │       ├── profile/route.ts  # GET profile + requests + health incidents (live)
+    │       ├── requests/route.ts # POST approve / decline
+    │       ├── alerts/route.ts   # POST acknowledge / resolve a health alert
+    │       └── report/[id]/route.ts  # POST synthesize (or return cached) clinical report
+    ├── lib/db.ts                 # Neon queries: profile, requests, health incidents, report
+    ├── lib/openai.ts             # OpenAI clinical synthesis — SBAR (server-only)
     ├── package.json · tsconfig.json · ...
-    └── .env.local                # DATABASE_URL (same Neon DB) — gitignored
+    └── .env.local                # DATABASE_URL + OPENAI_API_KEY (same Neon DB) — gitignored
 ```
 
 ## MCP tools (`yoda_iccp.py`)
@@ -96,6 +107,8 @@ yoda-mcp/                        ← repo root: the MCP server (Python)
 | `request_activity` | Create a **pending request** for the caregiver. Yoda never books directly. |
 | `update_knowledge_base` | Save preferences learned this conversation |
 | `book_meal_delivery` | Mock meal-delivery booking |
+| `begin_health_check` | Open a health incident the moment she reports feeling unwell (starts the safety timer) |
+| `complete_health_check` | File the triage with clinical red-flags → **mild** / **serious** |
 
 ## The database (Neon Postgres)
 
@@ -105,6 +118,9 @@ Two tables, shared between the MCP server and the dashboard:
   appended preferences + confirmed activities. (Set `KB_BACKEND=local` to use `data/profiles/*.json`
   instead — a bulletproof offline fallback.)
 - **`requests(id, senior_id, event jsonb, status, reference, …)`** — the request → approval workflow.
+- **`health_incidents(id, senior_id, triage_level, status, started_at, …, report jsonb)`** — health triage +
+  escalation; the no-response **emergency** is derived at query time from `started_at`, and `report` caches
+  the AI-synthesized SBAR handover.
 
 ## Run it
 
@@ -125,13 +141,15 @@ endpoint (→ Connected). Run **only one** MCP server at a time.
 cd dashboard
 npm install
 # .env.local:  DATABASE_URL=postgresql://...   (the same Neon DB)
+#              OPENAI_API_KEY=sk-...            (AI clinical report; server-side only)
+#              OPENAI_MODEL=gpt-4o-mini         (optional — defaults to gpt-4o-mini)
 npm run dev                        # http://localhost:3000
 ```
 
 ## Tests
 
 ```bash
-pytest          # matching, scoring, KB merge, services  (8 tests)
+pytest          # matching, scoring, KB merge, services, health triage + escalation  (14 tests)
 ```
 The full tool flow is also verifiable over the MCP protocol with an in-memory `fastmcp.Client`
 (profile → match → request → approve) — no hardware required.
@@ -145,5 +163,6 @@ integrations come online."
 
 ## Security
 
-`MCP_ENDPOINT` and `DATABASE_URL` are secrets — kept in `.env` / `.env.local` (both gitignored), never
-committed or shown in the deck. Rotate the MCP token via **Refresh** in the console if it ever leaks.
+`MCP_ENDPOINT`, `DATABASE_URL`, and `OPENAI_API_KEY` are secrets — kept in `.env` / `.env.local` (both
+gitignored), never committed or shown in the deck. Rotate the MCP token via **Refresh** in the console if it
+ever leaks.
