@@ -2,11 +2,17 @@
 
 import useSWR from "swr";
 import { useEffect, useRef, useState } from "react";
-import type { SeniorProfile, BookedActivity, ActivityRequest } from "@/lib/db";
+import type { SeniorProfile, BookedActivity, ActivityRequest, HealthIncident } from "@/lib/db";
+import AlertsPanel from "./components/alerts-panel";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-type ApiResp = { profile: SeniorProfile | null; requests: ActivityRequest[]; at: number };
+type ApiResp = {
+  profile: SeniorProfile | null;
+  requests: ActivityRequest[];
+  incidents: HealthIncident[];
+  at: number;
+};
 
 export default function CareDashboard() {
   const { data, error, isLoading, mutate } = useSWR<ApiResp>("/api/profile", fetcher, {
@@ -15,6 +21,7 @@ export default function CareDashboard() {
   });
 
   const [busy, setBusy] = useState<Set<number>>(new Set());
+  const [alertBusy, setAlertBusy] = useState<Set<number>>(new Set());
 
   // relative "updated Xs ago" ticker
   const [now, setNow] = useState(0);
@@ -22,6 +29,25 @@ export default function CareDashboard() {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Auto-generate the AI clinical report once per serious/emergency incident that has none yet.
+  const reportRequested = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    const need = (data?.incidents ?? []).filter(
+      (i) =>
+        (i.effective_status === "serious" || i.effective_status === "emergency") &&
+        !i.report &&
+        !reportRequested.current.has(i.id),
+    );
+    if (need.length === 0) return;
+    need.forEach((i) => reportRequested.current.add(i.id));
+    (async () => {
+      await Promise.all(
+        need.map((i) => fetch(`/api/report/${i.id}`, { method: "POST" }).catch(() => {})),
+      );
+      await mutate();
+    })();
+  }, [data, mutate]);
 
   const seen = useRef<Set<string>>(new Set());
   const profile = data?.profile ?? null;
@@ -31,6 +57,7 @@ export default function CareDashboard() {
 
   const pending = (data?.requests ?? []).filter((r) => r.status === "pending");
   const confirmed = yp?.booked_activities ?? [];
+  const incidents = data?.incidents ?? [];
 
   const name = ident?.preferred_name ?? yp?.preferred_address ?? "—";
   const initials = name.replace(/^Mdm\s+|^Mr\s+|^Mrs\s+/i, "").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
@@ -50,6 +77,24 @@ export default function CareDashboard() {
       await mutate();
     } finally {
       setBusy((p) => {
+        const n = new Set(p);
+        n.delete(id);
+        return n;
+      });
+    }
+  }
+
+  async function decideAlert(id: number, action: "acknowledge" | "resolve") {
+    setAlertBusy((p) => new Set(p).add(id));
+    try {
+      await fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      await mutate();
+    } finally {
+      setAlertBusy((p) => {
         const n = new Set(p);
         n.delete(id);
         return n;
@@ -97,6 +142,9 @@ export default function CareDashboard() {
           )}
         </div>
       </section>
+
+      {/* HEALTH — triage alerts + escalation (Feature 3), surfaced first */}
+      <AlertsPanel incidents={incidents} profile={profile} now={now} busy={alertBusy} onDecide={decideAlert} />
 
       {/* PENDING — needs the caregiver's decision */}
       {pending.length > 0 && (

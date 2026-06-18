@@ -17,11 +17,33 @@ export type SeniorProfile = {
     preferred_name?: string;
     name?: string;
     age?: number;
+    gender?: string;
     location?: string;
     living_arrangement?: string;
   };
   section_p_caregiver?: {
     primary_caregiver?: { relationship?: string; name?: string; availability?: string };
+  };
+  // interRAI health sections surfaced on a health alert (Feature 3)
+  section_e_health_conditions?: {
+    falls?: { last_30_days?: string; "31_to_90_days_ago"?: string; "91_to_180_days_ago"?: string };
+    problem_frequency_last_3_days?: Record<string, string>;
+    pain_symptoms?: { frequency?: string; intensity?: string; location?: string };
+  };
+  section_f_disease_diagnoses?: Record<string, string>;
+  // medications + advance-care directives (used in the paramedic handover, Feature 3.5)
+  section_m_medications?: {
+    total_medications?: number;
+    adherence?: string;
+    medications?: { name?: string; dose?: string; frequency?: string; for?: string }[];
+    allergies?: string[];
+  };
+  section_s_directives?: {
+    appointed_donee_or_deputy?: boolean;
+    advance_care_planning_done?: boolean;
+    acp_date?: string;
+    preferred_care_plan?: string;
+    resuscitation_preference?: string;
   };
   yoda_profile?: {
     preferred_address?: string;
@@ -97,4 +119,97 @@ export async function decideRequest(id: number, decision: "approve" | "decline")
       WHERE senior_id = ${r.senior_id}
     `;
   }
+}
+
+/* ---------- Feature 3: health incidents (triage + escalation) ---------- */
+
+// AI-synthesized clinical report (Feature 3.5) — produced server-side from the incident + interRAI record.
+export type HealthReport = {
+  caregiver_summary: { what_happened: string; why_it_matters: string; do_now: string[] };
+  sbar: { situation: string; background: string; assessment: string; recommendation: string };
+  paramedic_handover: {
+    presenting: string;
+    key_history: string;
+    medications: string;
+    allergies: string;
+    code_status: string;
+    mobility: string;
+    caregiver_contact: string;
+  };
+  red_flags: string[];
+  confidence_note: string;
+};
+
+export type HealthIncident = {
+  id: number;
+  senior_id?: string;
+  complaint?: string | null;
+  primary_symptom?: string | null;
+  location?: string | null;
+  severity_1_10?: number | null;
+  dizziness?: boolean;
+  chest_pain?: boolean;
+  triage_level?: "mild" | "serious" | null;
+  status: "in_progress" | "triaged" | "acknowledged" | "resolved";
+  notes?: string | null;
+  started_at?: string;
+  triaged_at?: string | null;
+  // Derived in SQL: 'checking' (mid-triage) | 'mild' | 'serious' | 'emergency' (no response) | 'acknowledged'
+  effective_status: "checking" | "mild" | "serious" | "emergency" | "acknowledged";
+  age_s?: number;
+  report?: HealthReport | null;
+  report_generated_at?: string | null;
+};
+
+// How long an open (in_progress) incident may sit before silence reads as an emergency.
+const EMERGENCY_TIMEOUT_S = Number(process.env.EMERGENCY_TIMEOUT_S ?? 25);
+
+/** Active health incidents, newest first, with effective_status computed at query time.
+ *  The 'emergency' value IS the no-response watchdog: derived from now() vs started_at,
+ *  so the dashboard's normal 3s poll surfaces an escalation with no cron/worker. */
+export async function listHealthIncidents(seniorId = "mdm-tan"): Promise<HealthIncident[]> {
+  const rows = (await sql`
+    SELECT id, senior_id, complaint, primary_symptom, location, severity_1_10, dizziness, chest_pain,
+           triage_level, status, notes, started_at, triaged_at, report, report_generated_at,
+           CASE
+             WHEN status = 'in_progress' AND now() - started_at > make_interval(secs => ${EMERGENCY_TIMEOUT_S}) THEN 'emergency'
+             WHEN status = 'in_progress' THEN 'checking'
+             WHEN status = 'triaged' AND triage_level = 'serious' THEN 'serious'
+             WHEN status = 'triaged' AND triage_level = 'mild'    THEN 'mild'
+             ELSE status
+           END AS effective_status,
+           EXTRACT(EPOCH FROM (now() - started_at))::int AS age_s
+    FROM health_incidents
+    WHERE senior_id = ${seniorId} AND status <> 'resolved'
+    ORDER BY started_at DESC
+  `) as HealthIncident[];
+  return rows;
+}
+
+/** Caregiver action on an alert: acknowledge (seen, still open) or resolve (closed). */
+export async function decideIncident(id: number, action: "acknowledge" | "resolve"): Promise<void> {
+  const status = action === "resolve" ? "resolved" : "acknowledged";
+  await sql`
+    UPDATE health_incidents SET status = ${status}, decided_at = now() WHERE id = ${id}
+  `;
+}
+
+/** One incident by id (incl. any cached report) — used by the report route + printable page. */
+export async function getIncident(id: number): Promise<HealthIncident | null> {
+  const rows = (await sql`
+    SELECT id, senior_id, complaint, primary_symptom, location, severity_1_10, dizziness, chest_pain,
+           triage_level, status, notes, started_at, triaged_at, report, report_generated_at,
+           status AS effective_status
+    FROM health_incidents WHERE id = ${id}
+  `) as HealthIncident[];
+  return rows[0] ?? null;
+}
+
+/** Cache a generated clinical report on the incident row. */
+export async function saveReport(id: number, report: HealthReport, model: string): Promise<void> {
+  await sql`
+    UPDATE health_incidents
+    SET report = ${JSON.stringify(report)}::jsonb, report_model = ${model}, report_generated_at = now()
+    WHERE id = ${id}
+  `;
 }
