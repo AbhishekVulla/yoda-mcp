@@ -201,6 +201,91 @@ private:
         ESP_LOGI(TAG, "Yoda welfare web server started on port 80 (/ping /camera/on /capture /stream /camera/off)");
     }
 
+    // ---- Cloud relay: poll the deployed dashboard for ping/camera, push JPEG photos up ----
+    // No LAN IP needed — the necklace reaches the cloud outbound, so the caregiver can see
+    // the senior from anywhere. The LAN HTTP server above stays as a same-Wi-Fi fallback.
+
+    static bool PollCloud(const char* lan_ip, bool& ping, bool& camera) {
+        auto http = Board::GetInstance().GetNetwork()->CreateHttp(3);
+        std::string url = std::string(YODA_CLOUD_BASE) + "/api/device/poll?senior=" + YODA_SENIOR_ID
+                          + "&ip=" + lan_ip + "&token=" + YODA_DEVICE_TOKEN;
+        if (!http->Open("GET", url)) { http->Close(); return false; }
+        int code = http->GetStatusCode();
+        std::string body = http->ReadAll();
+        http->Close();
+        if (code != 200) { ESP_LOGW(TAG, "relay poll HTTP %d", code); return false; }
+        ping = body.find("\"ping\":true") != std::string::npos;
+        camera = body.find("\"camera\":true") != std::string::npos;
+        return true;
+    }
+
+    static void PushFrame() {
+        if (s_camera == nullptr) return;
+        std::string jpeg;
+        if (!s_camera->CaptureToJpeg(jpeg) || jpeg.empty()) { ESP_LOGW(TAG, "relay: capture failed"); return; }
+        size_t n = jpeg.size();
+        auto http = Board::GetInstance().GetNetwork()->CreateHttp(3);
+        std::string url = std::string(YODA_CLOUD_BASE) + "/api/device/frame?senior=" + YODA_SENIOR_ID
+                          + "&token=" + YODA_DEVICE_TOKEN;
+        http->SetHeader("Content-Type", "image/jpeg");
+        http->SetContent(std::move(jpeg));
+        if (!http->Open("POST", url)) { http->Close(); ESP_LOGW(TAG, "relay: frame POST open failed"); return; }
+        int code = http->GetStatusCode();
+        http->Close();
+        ESP_LOGI(TAG, "relay: pushed frame %u bytes (HTTP %d)", (unsigned)n, code);
+    }
+
+    void WelfareRelayLoop(const char* lan_ip) {
+        bool announced = false;  // play the privacy announce once per camera session
+        while (true) {
+            // Only reach the cloud when she's idle — never contend with an active voice conversation
+            // over the single radio/TLS stack (that contention caused the SSL -76 read errors).
+            if (Application::GetInstance().GetDeviceState() == kDeviceStateIdle) {
+                bool ping = false, camera = false;
+                if (PollCloud(lan_ip, ping, camera)) {
+                    if (ping) {
+                        std::string_view door(door_ogg_start, (size_t)(door_ogg_end - door_ogg_start));
+                        Application::GetInstance().PlaySound(door);
+                        ESP_LOGI(TAG, "relay: ping -> door announce");
+                    }
+                    if (camera) {
+                        if (!announced) {
+                            std::string_view checking(checking_ogg_start, (size_t)(checking_ogg_end - checking_ogg_start));
+                            Application::GetInstance().PlaySound(checking);
+                            announced = true;
+                            ESP_LOGI(TAG, "relay: camera on -> privacy announce");
+                            vTaskDelay(pdMS_TO_TICKS(2500));  // let the announce finish before the first photo
+                        }
+                        PushFrame();  // one frame per poll — never hog the radio/CPU (keeps the wake word alive)
+                    } else {
+                        announced = false;  // reset for the next camera session
+                    }
+                }
+            } else {
+                announced = false;  // a conversation interrupted; re-announce next camera session
+            }
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+    }
+
+    // Wait for the STA IP, then poll the cloud forever (self-reports the LAN IP for the fallback).
+    void InitializeWelfareRelay() {
+        xTaskCreate([](void* arg) {
+            auto* self = static_cast<YodaPendant*>(arg);
+            esp_netif_ip_info_t ip = {};
+            while (true) {
+                esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+                if (netif != nullptr && esp_netif_get_ip_info(netif, &ip) == ESP_OK && ip.ip.addr != 0) break;
+                vTaskDelay(pdMS_TO_TICKS(1000));
+            }
+            char ipbuf[16] = {};
+            esp_ip4addr_ntoa(&ip.ip, ipbuf, sizeof(ipbuf));
+            ESP_LOGI(TAG, "=== YODA RELAY: polling cloud at %s (caregiver sees her from anywhere) ===", YODA_CLOUD_BASE);
+            self->WelfareRelayLoop(ipbuf);
+            vTaskDelete(nullptr);
+        }, "yoda_relay", 8192, this, 4, nullptr);
+    }
+
     // httpd needs lwip/tcpip ready, which is NOT the case in the board constructor.
     // Wait (in a task) until the STA has an IP, then start the server and log the IP.
     void InitializeWebServer() {
@@ -227,12 +312,14 @@ public:
         InitializeButtons();
         InitializeCamera();
         InitializeWebServer();
+        InitializeWelfareRelay();
     }
 
     virtual AudioCodec* GetAudioCodec() override {
         static NoAudioCodecSimplexPdm audio_codec(
             AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT,
+            I2S_STD_SLOT_BOTH,  // duplicate mono to L+R so the NS4168 amp hears it on either channel
             AUDIO_I2S_MIC_GPIO_CLK, AUDIO_I2S_MIC_GPIO_DIN);
         return &audio_codec;
     }

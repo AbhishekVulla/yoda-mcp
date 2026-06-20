@@ -13,10 +13,11 @@
 #define AUDIO_INPUT_SAMPLE_RATE  16000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
-// MAX98357A amplifier — verified wiring on the necklace (LRC=GPIO1, BCLK=GPIO2, DIN=GPIO3, VIN=5V)
-#define AUDIO_I2S_SPK_GPIO_BCLK  GPIO_NUM_2   // BCLK
-#define AUDIO_I2S_SPK_GPIO_LRCK  GPIO_NUM_1   // LRC / WS
-#define AUDIO_I2S_SPK_GPIO_DOUT  GPIO_NUM_3   // DIN on the amp
+// I2S amplifier — wired to XIAO pads D8/D9/D10 (note: silk D-labels != GPIO; D8=GPIO7, D9=GPIO8, D10=GPIO9).
+// amp BCLK->D8(GPIO7), amp LRC->D9(GPIO8), amp DIN->D10(GPIO9), VIN->5V, GND->GND.
+#define AUDIO_I2S_SPK_GPIO_BCLK  GPIO_NUM_7   // BCLK  -> pad D8
+#define AUDIO_I2S_SPK_GPIO_LRCK  GPIO_NUM_8   // LRC/WS -> pad D9
+#define AUDIO_I2S_SPK_GPIO_DOUT  GPIO_NUM_9   // DIN on the amp -> pad D10
 
 // Onboard PDM microphone (XIAO ESP32-S3 Sense daughterboard)
 #define AUDIO_I2S_MIC_GPIO_CLK   GPIO_NUM_42  // PDM clock
@@ -43,5 +44,13 @@
 #define CAMERA_PIN_HREF   GPIO_NUM_47
 #define CAMERA_PIN_PCLK   GPIO_NUM_13
 #define XCLK_FREQ_HZ      20000000
+
+// ---------------- Cloud relay (welfare from anywhere, no LAN IP) ----------------
+// The necklace polls the deployed dashboard for ping/camera commands and pushes JPEG
+// photos up, so the caregiver can check on the senior over the internet. The LAN HTTP
+// server (yoda_pendant_board.cc) is kept as a same-Wi-Fi fallback.
+#define YODA_CLOUD_BASE   "https://yoda-care-dashboard.up.railway.app"
+#define YODA_DEVICE_TOKEN "REPLACE_WITH_DEVICE_TOKEN_MATCHING_DASHBOARD_ENV"
+#define YODA_SENIOR_ID    "mdm-tan"
 
 #endif // _BOARD_CONFIG_H_
