@@ -1,0 +1,7 @@
+dashboard/
+firmware/
+.venv/
+__pycache__/
+*.bat
+*.pyc
+data/profiles/*.local.json

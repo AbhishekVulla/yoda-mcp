@@ -41,7 +41,8 @@ function careContext(p: SeniorProfile | null) {
   const hasFall = !!fall && !/no fall/i.test(fall);
   const pain = e?.pain_symptoms;
   const diagnoses = Object.entries(p?.section_f_disease_diagnoses ?? {})
-    .filter(([, v]) => /present/i.test(String(v)))
+    // values are "Present, treated or monitored" vs "Not present" — keep only the actually-present ones
+    .filter(([, v]) => String(v).trim().toLowerCase().startsWith("present"))
     .map(([k]) => k.replace(/_/g, " "));
   const flags = p?.yoda_profile?.risk_flags ?? [];
   return { fall, hasFall, pain, diagnoses, flags };

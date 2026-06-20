@@ -213,3 +213,82 @@ export async function saveReport(id: number, report: HealthReport, model: string
     WHERE id = ${id}
   `;
 }
+
+/* ---------- Cloud-relay welfare (no LAN IP): device polls + pushes photos ---------- */
+
+export type WelfareFrame = {
+  frame: string | null; // base64 JPEG (no data: prefix)
+  frame_at: string | null;
+  last_seen: string | null;
+  device_ip: string | null;
+  camera_requested: boolean;
+  online: boolean;
+};
+
+/** Necklace poll: record it's alive (+ its LAN IP), deliver pending commands, clear the one-shot ping. */
+export async function recordPoll(seniorId: string, ip: string | null): Promise<{ ping: boolean; camera: boolean }> {
+  const cur = (await sql`
+    SELECT ping_requested, camera_requested FROM device_state WHERE senior_id = ${seniorId}
+  `) as { ping_requested: boolean; camera_requested: boolean }[];
+  const ping = cur[0]?.ping_requested ?? false;
+  const camera = cur[0]?.camera_requested ?? false;
+  await sql`
+    INSERT INTO device_state (senior_id, last_seen, device_ip, ping_requested, updated_at)
+    VALUES (${seniorId}, now(), ${ip}, false, now())
+    ON CONFLICT (senior_id) DO UPDATE
+      SET last_seen = now(),
+          device_ip = COALESCE(${ip}, device_state.device_ip),
+          ping_requested = false,
+          updated_at = now()
+  `;
+  return { ping, camera };
+}
+
+/** Necklace upload: store the latest photo (base64 JPEG). */
+export async function saveFrame(seniorId: string, base64: string): Promise<void> {
+  await sql`
+    INSERT INTO device_state (senior_id, latest_frame, frame_at, last_seen, updated_at)
+    VALUES (${seniorId}, ${base64}, now(), now(), now())
+    ON CONFLICT (senior_id) DO UPDATE
+      SET latest_frame = ${base64}, frame_at = now(), last_seen = now(), updated_at = now()
+  `;
+}
+
+/** Caregiver action: ping (beep+announce) or camera on/off. */
+export async function setWelfareCommand(seniorId: string, action: "ping" | "camera_on" | "camera_off"): Promise<void> {
+  if (action === "ping") {
+    await sql`
+      INSERT INTO device_state (senior_id, ping_requested, updated_at) VALUES (${seniorId}, true, now())
+      ON CONFLICT (senior_id) DO UPDATE SET ping_requested = true, updated_at = now()`;
+  } else {
+    const on = action === "camera_on";
+    await sql`
+      INSERT INTO device_state (senior_id, camera_requested, updated_at) VALUES (${seniorId}, ${on}, now())
+      ON CONFLICT (senior_id) DO UPDATE SET camera_requested = ${on}, updated_at = now()`;
+  }
+}
+
+/** Dashboard read: the latest photo + online/IP status. `online` = polled within ~12s. */
+export async function getWelfareFrame(seniorId: string): Promise<WelfareFrame> {
+  const rows = (await sql`
+    SELECT latest_frame, frame_at, last_seen, device_ip, camera_requested,
+           (last_seen IS NOT NULL AND now() - last_seen < interval '45 seconds') AS online
+    FROM device_state WHERE senior_id = ${seniorId}
+  `) as {
+    latest_frame: string | null;
+    frame_at: string | null;
+    last_seen: string | null;
+    device_ip: string | null;
+    camera_requested: boolean;
+    online: boolean;
+  }[];
+  const r = rows[0];
+  return {
+    frame: r?.latest_frame ?? null,
+    frame_at: r?.frame_at ?? null,
+    last_seen: r?.last_seen ?? null,
+    device_ip: r?.device_ip ?? null,
+    camera_requested: r?.camera_requested ?? false,
+    online: r?.online ?? false,
+  };
+}
