@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { useEffect, useRef, useState } from "react";
 import type { SeniorProfile, BookedActivity, ActivityRequest, HealthIncident } from "@/lib/db";
 import AlertsPanel from "./components/alerts-panel";
+import ScreenTabs from "./components/screen-tabs";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -60,7 +61,7 @@ export default function CareDashboard() {
   const incidents = data?.incidents ?? [];
 
   const name = ident?.preferred_name ?? yp?.preferred_address ?? "—";
-  const initials = name.replace(/^Mdm\s+|^Mr\s+|^Mrs\s+/i, "").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+  const initials = name.replace(/^Madam\s+|^Mdm\s+|^Mr\s+|^Mrs\s+/i, "").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
   const caregiverFirst = caregiver?.name?.split(" ")[0] ?? "you";
 
   const updatedAgo = data?.at ? Math.max(0, Math.round((now - data.at) / 1000)) : null;
@@ -103,7 +104,7 @@ export default function CareDashboard() {
   }
 
   if (error) return <Centered>Couldn&apos;t reach the care database. Is the dev server connected to Neon?</Centered>;
-  if (isLoading && !profile) return <Centered>Opening Mdm Tan&apos;s care…</Centered>;
+  if (isLoading && !profile) return <Centered>Opening Madam Tan&apos;s care…</Centered>;
   if (!profile) return <Centered>No profile found for <code>mdm-tan</code> in Neon yet.</Centered>;
 
   return (
@@ -114,7 +115,10 @@ export default function CareDashboard() {
           <span className="font-display text-[26px] font-semibold italic tracking-tight text-ink">Yoda</span>
           <span className="text-[13px] font-medium uppercase tracking-[0.18em] text-faint">Care</span>
         </div>
-        <LivePill agoLabel={agoLabel} />
+        <div className="flex items-center gap-3">
+          <ScreenTabs current="care" />
+          <LivePill agoLabel={agoLabel} />
+        </div>
       </div>
 
       {/* header card */}

@@ -113,7 +113,7 @@ export default function AlertsPanel({
                   </div>
                   <p className="mt-1.5 font-display text-[18px] font-semibold leading-tight text-ink">
                     {emergency
-                      ? "No response — Mdm Tan stopped answering"
+                      ? "No response — Madam Tan stopped answering"
                       : inc.primary_symptom || inc.complaint || "Health concern"}
                   </p>
                   {emergency ? (

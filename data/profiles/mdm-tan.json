@@ -4,7 +4,7 @@
 
   "section_a_identification": {
     "name": "Tan Ah Moey",
-    "preferred_name": "Mdm Tan",
+    "preferred_name": "Madam Tan",
     "gender": "Female",
     "birthdate": "1954-03-12",
     "age": 72,
@@ -197,7 +197,7 @@
   },
 
   "yoda_profile": {
-    "preferred_address": "Mdm Tan",
+    "preferred_address": "Madam Tan",
     "language_preference": "English with some Mandarin phrases",
     "enrolled_services": ["Meals on Wheels"],
     "interests": ["Mandarin songs", "Gardening", "Mahjong with neighbours"],

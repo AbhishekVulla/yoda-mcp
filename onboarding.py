@@ -1,7 +1,7 @@
 """Short activity-onboarding questions, in PRD order.
 
 Yoda should SKIP any question whose answer is already in the senior's profile
-(`get_senior_profile`) — that's the "no 20-question form" promise. For Mdm Tan, most
+(`get_senior_profile`) — that's the "no 20-question form" promise. For Madam Tan, most
 of these are already on file, so the conversation is really just a confirmation.
 """
 

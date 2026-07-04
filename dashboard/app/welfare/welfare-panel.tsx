@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SeniorProfile, ActivityRequest, WelfareFrame } from "@/lib/db";
+import ScreenTabs from "../components/screen-tabs";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 type ApiResp = { profile: SeniorProfile | null; requests: ActivityRequest[]; at: number };
@@ -18,9 +19,9 @@ function deviceUrl(ip: string, path: string) {
 export default function WelfarePanel() {
   const { data } = useSWR<ApiResp>("/api/profile", fetcher, { revalidateOnFocus: false });
   const ident = data?.profile?.section_a_identification;
-  const name = ident?.preferred_name ?? "Mdm Tan";
+  const name = ident?.preferred_name ?? "Madam Tan";
   const address = ident?.location ?? "Blk 123 Bedok North";
-  const initials = name.replace(/^Mdm\s+|^Mr\s+|^Mrs\s+/i, "").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+  const initials = name.replace(/^Madam\s+|^Mdm\s+|^Mr\s+|^Mrs\s+/i, "").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
 
   // The cloud relay: device check-in + the latest photo it pushed. Poll fast (~800ms) so the
   // continuously-pushed frames render like a (low-fps) video rather than a slow slideshow.
@@ -34,6 +35,7 @@ export default function WelfarePanel() {
   const deviceIp = welfare?.device_ip ?? null;
 
   const [step, setStep] = useState<Step>("idle");
+  const [lanStream, setLanStream] = useState(false); // same-Wi-Fi smooth video vs cloud slideshow
   const [busy, setBusy] = useState<null | "ping" | "camera">(null);
   const [log, setLog] = useState<LogItem[]>([]);
   const [now, setNow] = useState(0);
@@ -83,10 +85,21 @@ export default function WelfarePanel() {
   async function onCamera() {
     setBusy("camera");
     try {
-      await command("camera_on");
-      setStep("camera");
-      addLog(`Yoda will announce “we're checking on you now”, then send a photo`, "accent");
-      refreshFrame();
+      if (deviceIp) {
+        // Same Wi-Fi (demo): arm + announce directly on the necklace, then stream smooth MJPEG.
+        const r = await fetch(deviceUrl(deviceIp, "/camera/on")).catch(() => null);
+        if (!r || !r.ok) throw new Error("Couldn't reach the necklace on this Wi-Fi — is the laptop on the same network?");
+        setStep("camera");
+        setLanStream(true);
+        addLog(`Yoda announced “we're checking on you now” — live video starting`, "accent");
+      } else {
+        // Remote: fall back to the cloud relay (photo-by-photo, slower).
+        await command("camera_on");
+        setStep("camera");
+        setLanStream(false);
+        addLog(`Yoda will announce, then send photos to the cloud`, "accent");
+        refreshFrame();
+      }
     } catch (e) {
       addLog((e as Error).message, "coral");
     } finally {
@@ -96,8 +109,10 @@ export default function WelfarePanel() {
 
   async function onResolve() {
     try {
+      if (deviceIp) await fetch(deviceUrl(deviceIp, "/camera/off")).catch(() => {});
       await command("camera_off").catch(() => {});
     } finally {
+      setLanStream(false);
       setStep("idle");
       addLog("Marked resolved — camera turned off", "green");
     }
@@ -113,7 +128,7 @@ export default function WelfarePanel() {
           <span className="font-display text-[26px] font-semibold italic tracking-tight text-ink">Yoda</span>
           <span className="text-[13px] font-medium uppercase tracking-[0.18em] text-faint">Welfare check</span>
         </div>
-        <a href="/" className="text-[13px] font-medium text-muted underline-offset-4 hover:underline">← Care dashboard</a>
+        <ScreenTabs current="welfare" />
       </div>
 
       {/* senior + status */}
@@ -142,7 +157,7 @@ export default function WelfarePanel() {
       {/* STEP 1 — ping */}
       <StepCard
         n={1}
-        title="Ping Mdm Tan"
+        title="Ping Madam Tan"
         done={step !== "idle"}
         desc="Yoda beeps and says out loud: “someone is at the door with your food. Please go to the door now.”"
         delay="120ms"
@@ -152,7 +167,7 @@ export default function WelfarePanel() {
           disabled={busy === "ping"}
           className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[14px] font-semibold text-white shadow-[0_2px_12px_rgba(217,114,47,0.3)] transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {busy === "ping" ? "Pinging…" : step !== "idle" ? "Ping again" : "Ping Mdm Tan"}
+          {busy === "ping" ? "Pinging…" : step !== "idle" ? "Ping again" : "Ping Madam Tan"}
         </button>
         {step !== "idle" && (
           <span className="text-[13px] font-medium text-green">✓ Ping sent — waiting for her to respond</span>
@@ -164,7 +179,7 @@ export default function WelfarePanel() {
         n={2}
         title="Request camera view"
         locked={step === "idle"}
-        desc="Yoda announces “we are checking on you now”, then the necklace sends a photo to the cloud so you can see she's okay — from anywhere."
+        desc="Yoda announces “we are checking on you now”, then shows a live view of the room so you can see she's okay."
         delay="200ms"
       >
         {step !== "camera" ? (
@@ -182,10 +197,17 @@ export default function WelfarePanel() {
           <div className="w-full">
             <div className="relative overflow-hidden rounded-[16px] border border-line bg-black/90 shadow-inner">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {shownFrame ? (
+              {lanStream && deviceIp ? (
+                // smooth same-Wi-Fi MJPEG — a real video feed, not a slideshow
+                <img
+                  src={deviceUrl(deviceIp, "/stream")}
+                  alt="Live video from Madam Tan's necklace"
+                  className="aspect-[4/3] w-full object-cover"
+                />
+              ) : shownFrame ? (
                 <img
                   src={shownFrame}
-                  alt="Live view from Mdm Tan's necklace"
+                  alt="Live view from Madam Tan's necklace"
                   className="aspect-[4/3] w-full object-cover"
                 />
               ) : (
@@ -198,14 +220,22 @@ export default function WelfarePanel() {
               <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-coral/90 px-2.5 py-1 text-[11px] font-semibold text-white">
                 <span className="h-1.5 w-1.5 rounded-full bg-white live-dot" /> LIVE
               </span>
-              {frameAgo && (
+              {lanStream ? (
+                <span className="absolute right-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium text-white/85">
+                  live video · same Wi-Fi
+                </span>
+              ) : frameAgo ? (
                 <span className="absolute right-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium text-white/85">
                   updated {frameAgo}
                 </span>
-              )}
+              ) : null}
             </div>
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-[12.5px] text-muted">Live · relayed from the cloud · she was told the camera is on</span>
+              <span className="text-[12.5px] text-muted">
+                {lanStream
+                  ? "Live video · streaming directly from the necklace · she was told the camera is on"
+                  : "Live · relayed from the cloud · she was told the camera is on"}
+              </span>
               <button
                 onClick={onResolve}
                 className="rounded-full bg-green px-4 py-2 text-[13px] font-semibold text-white shadow-[0_2px_10px_rgba(60,122,85,0.25)] transition-transform hover:scale-[1.02]"
@@ -216,23 +246,6 @@ export default function WelfarePanel() {
             <p className="mt-3 text-[12.5px] text-faint">
               After viewing, decide next steps yourself — call her, call family, or dial 995. Yoda does not escalate on its own.
             </p>
-
-            {/* LAN fallback — only works if THIS dashboard is on the same Wi-Fi as the necklace */}
-            <details className="mt-4 rounded-[12px] border border-line bg-paper/50 px-3.5 py-2.5">
-              <summary className="cursor-pointer text-[12px] font-medium text-faint">Advanced · direct same-Wi-Fi view (faster)</summary>
-              {deviceIp ? (
-                <div className="mt-2">
-                  <p className="mb-1.5 text-[12px] text-faint">
-                    Live MJPEG straight from the necklace at <span className="font-mono">{deviceIp}</span> — only renders if this
-                    page is on the same Wi-Fi (won't work on the public URL).
-                  </p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={deviceUrl(deviceIp, "/stream")} alt="Direct LAN view" className="aspect-[4/3] w-full rounded-[10px] object-cover" />
-                </div>
-              ) : (
-                <p className="mt-2 text-[12px] text-faint">Necklace hasn&apos;t reported its local IP yet.</p>
-              )}
-            </details>
           </div>
         )}
       </StepCard>

@@ -1,6 +1,6 @@
 # Yoda Care Dashboard
 
-The **caregiver** side of Yoda. A live, read/write view of one senior (Mdm Tan) that reflects what
+The **caregiver** side of Yoda. A live, read/write view of one senior (Madam Tan) that reflects what
 Yoda has arranged and lets the caregiver **approve or decline** each request.
 
 - **Needs your approval** — pending activity requests Yoda raised (`request_activity`), with
