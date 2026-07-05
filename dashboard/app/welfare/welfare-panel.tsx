@@ -74,7 +74,7 @@ export default function WelfarePanel() {
     try {
       await command("ping");
       setStep((s) => (s === "idle" ? "pinged" : s));
-      addLog(`Ping sent — Yoda will beep and say “someone's at the door” on her next check-in`, "accent");
+      addLog(`Ping sent — Jarvis will beep and ask her to respond`, "accent");
     } catch (e) {
       addLog((e as Error).message, "coral");
     } finally {
@@ -91,13 +91,13 @@ export default function WelfarePanel() {
         if (!r || !r.ok) throw new Error("Couldn't reach the necklace on this Wi-Fi — is the laptop on the same network?");
         setStep("camera");
         setLanStream(true);
-        addLog(`Yoda announced “we're checking on you now” — live video starting`, "accent");
+        addLog(`Jarvis announced “we're checking on you now” — live video starting`, "accent");
       } else {
         // Remote: fall back to the cloud relay (photo-by-photo, slower).
         await command("camera_on");
         setStep("camera");
         setLanStream(false);
-        addLog(`Yoda will announce, then send photos to the cloud`, "accent");
+        addLog(`Jarvis will announce, then send photos to the cloud`, "accent");
         refreshFrame();
       }
     } catch (e) {
@@ -125,7 +125,7 @@ export default function WelfarePanel() {
       {/* top bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-[26px] font-semibold italic tracking-tight text-ink">Yoda</span>
+          <span className="font-display text-[26px] font-semibold italic tracking-tight text-ink">Jarvis</span>
           <span className="text-[13px] font-medium uppercase tracking-[0.18em] text-faint">Welfare check</span>
         </div>
         <ScreenTabs current="welfare" />
@@ -141,7 +141,7 @@ export default function WelfarePanel() {
           <p className="mt-1.5 text-[15px] text-muted">{address}</p>
         </div>
         <span className="shrink-0 rounded-full bg-coral-soft px-3 py-1.5 text-[12.5px] font-semibold text-coral">
-          Delivery attempted · no response
+          Doorbell + call · no answer
         </span>
       </section>
 
@@ -151,7 +151,7 @@ export default function WelfarePanel() {
           <span className={`h-2 w-2 rounded-full ${online ? "bg-green live-dot" : "bg-faint"}`} />
           {online ? "Necklace online" : "Necklace offline — not checked in recently"}
         </span>
-        <span className="ml-auto text-[12px] text-faint">No setup — Yoda reaches the cloud from anywhere</span>
+        <span className="ml-auto text-[12px] text-faint">No setup — Jarvis reaches the cloud from anywhere</span>
       </div>
 
       {/* STEP 1 — ping */}
@@ -159,7 +159,7 @@ export default function WelfarePanel() {
         n={1}
         title="Ping Madam Tan"
         done={step !== "idle"}
-        desc="Yoda beeps and says out loud: “someone is at the door with your food. Please go to the door now.”"
+        desc="You couldn't reach her at the door or by phone. Jarvis beeps and asks her to respond — if she answers, you know she's okay."
         delay="120ms"
       >
         <button
@@ -177,9 +177,9 @@ export default function WelfarePanel() {
       {/* STEP 2 — camera (cloud relay) */}
       <StepCard
         n={2}
-        title="Request camera view"
+        title="View camera (only if no response)"
         locked={step === "idle"}
-        desc="Yoda announces “we are checking on you now”, then shows a live view of the room so you can see she's okay."
+        desc="Only if she doesn't answer the ping. Jarvis announces “we are checking on you now”, then shows a live view of the room so you can see she's okay."
         delay="200ms"
       >
         {step !== "camera" ? (
@@ -189,7 +189,7 @@ export default function WelfarePanel() {
               disabled={busy === "camera" || step === "idle"}
               className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-[14px] font-semibold text-white shadow-[0_2px_12px_rgba(34,29,22,0.25)] transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {busy === "camera" ? "Announcing…" : "Request camera view"}
+              {busy === "camera" ? "Announcing…" : "View camera"}
             </button>
             {step === "idle" && <span className="text-[12.5px] text-faint">Unlocks after you ping her</span>}
           </>
@@ -244,7 +244,7 @@ export default function WelfarePanel() {
               </button>
             </div>
             <p className="mt-3 text-[12.5px] text-faint">
-              After viewing, decide next steps yourself — call her, call family, or dial 995. Yoda does not escalate on its own.
+              After viewing, decide next steps yourself — call her, call family, or dial 995. Jarvis does not escalate on its own.
             </p>
           </div>
         )}

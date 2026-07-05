@@ -1,6 +1,6 @@
 {
   "senior_id": "mdm-tan",
-  "last_updated": "2026-06-16",
+  "last_updated": "2026-07-06",
 
   "section_a_identification": {
     "name": "Tan Ah Moey",
@@ -10,7 +10,7 @@
     "age": 72,
     "marital_status": "Widowed",
     "nric_type": "Singapore Pink",
-    "reason_for_assessment": "Routine assessment",
+    "reason_for_assessment": "Post-discharge review — coronary artery bypass graft (CABG), surgery 2 days ago",
     "residential_status": "HDB - 3 Room",
     "living_arrangement": "Alone",
     "location": "Bedok North"
@@ -39,7 +39,7 @@
     },
     "self_reported_mood": {
       "little_interest_or_pleasure": "In 1-2 of last 3 days",
-      "anxious_restless": "Not in last 3 days",
+      "anxious_restless": "In 1-2 of last 3 days",
       "sad_depressed_hopeless": "Not in last 3 days"
     },
     "social_relationships": {
@@ -69,23 +69,23 @@
       "shopping": "Supervision"
     },
     "adl_self_performance": {
-      "bathing": "Supervision",
+      "bathing": "Limited assistance",
       "personal_hygiene": "Independent",
-      "dressing_upper_body": "Independent",
+      "dressing_upper_body": "Limited assistance",
       "dressing_lower_body": "Independent",
-      "walking": "Independent",
-      "locomotion": "Independent",
+      "walking": "Supervision",
+      "locomotion": "Supervision",
       "locomotion_outside_home": "Limited assistance",
       "transfer_toilet": "Independent",
       "toilet_use": "Independent",
-      "bed_mobility": "Independent",
+      "bed_mobility": "Limited assistance",
       "eating": "Independent"
     },
     "functional_activities": {
       "primary_mode_of_locomotion": "Walking, uses assistive device (cane)",
       "total_hours_exercise_last_3_days": "Less than 1 hour",
-      "days_went_out_last_3_days": "1-2 days",
-      "change_in_adl_status_vs_90_days": "No change",
+      "days_went_out_last_3_days": "0 days",
+      "change_in_adl_status_vs_90_days": "Decline (post-surgery)",
       "drove_car_last_90_days": false
     }
   },
@@ -94,14 +94,14 @@
     "bladder_continence": "Continent",
     "bowel_continence": "Continent",
     "falls": {
-      "last_30_days": "One fall",
+      "last_30_days": "No falls",
       "31_to_90_days_ago": "No falls",
       "91_to_180_days_ago": "No falls"
     },
     "problem_frequency_last_3_days": {
-      "dizziness": "Not present",
-      "unsteady_gait": "Present but not exhibited in last 3 days",
-      "chest_pain": "Not present",
+      "dizziness": "Present but not exhibited in last 3 days",
+      "unsteady_gait": "Exhibited on 1-2 of last 3 days",
+      "chest_pain": "Present but not exhibited in last 3 days",
       "abnormal_thought_process": "Not present",
       "delusions": "Not present",
       "hallucinations": "Not present",
@@ -112,28 +112,28 @@
       "sleep_difficulty": "Exhibited on 1-2 of last 3 days",
       "fever": "Not present",
       "dehydration": "Not present",
-      "peripheral_oedema": "Not present"
+      "peripheral_oedema": "Present but not exhibited in last 3 days"
     },
     "dyspnoea": "Absent at rest, but present when performed moderate activities",
-    "fatigue": "Minimal — diminished energy but completes normal day-to-day activities",
+    "fatigue": "Moderate — diminished energy, needs rest after light activity (post-op)",
     "pain_symptoms": {
-      "frequency": "Present but not exhibited in last 3 days",
-      "intensity": "Mild",
-      "location": "Knees"
+      "frequency": "Present daily",
+      "intensity": "Moderate",
+      "location": "Chest (surgical incision site)"
     },
     "instability_of_conditions": {
-      "conditions_make_patterns_unstable": false,
-      "experiencing_acute_episode": false,
+      "conditions_make_patterns_unstable": true,
+      "experiencing_acute_episode": true,
       "end_stage_disease": false
     },
-    "self_reported_health": "Fair",
+    "self_reported_health": "Poor",
     "tobacco": "No",
     "alcohol": "No"
   },
 
   "section_f_disease_diagnoses": {
     "stroke_cva": "Not present",
-    "coronary_heart_disease": "Not present",
+    "coronary_heart_disease": "Present, treated or monitored",
     "copd": "Not present",
     "congestive_heart_failure": "Not present",
     "cancer": "Not present",
@@ -148,24 +148,26 @@
   "section_g_nutritional": {
     "weight_loss_5pct_last_30_days": false,
     "ate_one_or_fewer_meals_per_day": false,
-    "noticeable_decrease_in_food_intake": false,
+    "noticeable_decrease_in_food_intake": true,
     "fluid_intake_less_than_1000ml": false,
     "fluid_output_exceeds_input": false,
     "mode_of_nutritional_intake": "Normal — swallows all types of foods"
   },
 
   "section_h_procedures_treatments": {
-    "inpatient_hospital_last_90_days": 0,
-    "emergency_room_visits_last_90_days": 1,
-    "physician_visits_last_90_days": 3,
+    "recent_surgery": "Coronary artery bypass graft (CABG) — discharged 2 days ago",
+    "inpatient_hospital_last_90_days": 1,
+    "emergency_room_visits_last_90_days": 0,
+    "physician_visits_last_90_days": 4,
+    "medications": ["Aspirin", "Warfarin (blood thinner)", "Beta-blocker", "Statin", "Metformin"],
     "influenza_vaccine_last_year": true,
     "pneumovax_vaccine_last_5_years": true,
-    "wound_care": "Not ordered and did not occur"
+    "wound_care": "Ordered — chest (sternotomy) incision care post-CABG"
   },
 
   "section_i_finances_stressors": {
     "financial_trade_offs_last_30_days": false,
-    "major_life_stressors_last_90_days": false
+    "major_life_stressors_last_90_days": true
   },
 
   "section_p_caregiver": {
@@ -193,28 +195,28 @@
   },
 
   "section_k_overall_status": {
-    "overall_self_sufficiency_vs_90_days": "No change"
+    "overall_self_sufficiency_vs_90_days": "Decline (recovering from surgery)"
   },
 
   "yoda_profile": {
     "preferred_address": "Madam Tan",
     "language_preference": "English with some Mandarin phrases",
-    "enrolled_services": ["Meals on Wheels"],
+    "enrolled_services": ["Post-discharge home care", "Cardiac rehab (pending)"],
     "interests": ["Mandarin songs", "Gardening", "Mahjong with neighbours"],
     "fitness_preferences": {
       "new_to_fitness_classes": true,
       "preferred_day": "Weekday",
-      "goals": ["balance", "stability"],
-      "recent_injury_or_surgery": false,
+      "goals": ["cardiac recovery", "gentle mobility"],
+      "recent_injury_or_surgery": true,
       "preferred_location": "Heartbeat@Bedok",
-      "open_to_volunteering": true
+      "open_to_volunteering": false
     },
     "risk_flags": [
-      "One fall in last 30 days",
-      "Mild loneliness — occasional",
-      "Reduced social activity in last 90 days",
-      "Diabetes managed with medication",
-      "Knee pain affecting mobility"
+      "Heart bypass surgery (CABG) 2 days ago — just discharged",
+      "On cardiac medications + blood thinner (warfarin)",
+      "Post-op chest incision — infection / bleeding watch",
+      "Lives alone, no next of kin nearby",
+      "Diabetes + hypertension (comorbidities)"
     ],
     "booked_activities": [],
     "caregiver_alerts": []

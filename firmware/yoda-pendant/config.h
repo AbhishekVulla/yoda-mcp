@@ -49,7 +49,7 @@
 // The necklace polls the deployed dashboard for ping/camera commands and pushes JPEG
 // photos up, so the caregiver can check on the senior over the internet. The LAN HTTP
 // server (yoda_pendant_board.cc) is kept as a same-Wi-Fi fallback.
-#define YODA_CLOUD_BASE   "https://yoda-care-dashboard.up.railway.app"
+#define YODA_CLOUD_BASE   "https://jarvis-care-dashboard.up.railway.app"
 #define YODA_DEVICE_TOKEN "REPLACE_WITH_DEVICE_TOKEN_MATCHING_DASHBOARD_ENV"
 #define YODA_SENIOR_ID    "mdm-tan"
 

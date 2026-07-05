@@ -16,7 +16,7 @@
 #include <string>
 #include <string_view>
 
-#define TAG "YodaPendant"
+#define TAG "JarvisPendant"
 
 // Pre-rendered announce clips (Opus/OGG), embedded from assets/common/*.ogg.
 extern const char door_ogg_start[] asm("_binary_door_ogg_start");
@@ -89,9 +89,9 @@ private:
     // GET /ping  -> beep + "someone is at the door" announce
     static esp_err_t PingHandler(httpd_req_t* req) {
         AddCors(req);
-        std::string_view door(door_ogg_start, (size_t)(door_ogg_end - door_ogg_start));
-        Application::GetInstance().PlaySound(door);
-        ESP_LOGI(TAG, "/ping -> played door announce");
+        std::string_view checkin(checking_ogg_start, (size_t)(checking_ogg_end - checking_ogg_start));
+        Application::GetInstance().PlaySound(checkin);
+        ESP_LOGI(TAG, "/ping -> played check-in announce");
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"ok\":true,\"action\":\"ping\"}");
         return ESP_OK;
@@ -198,7 +198,7 @@ private:
         httpd_register_uri_handler(server_, &cam_off);
         httpd_register_uri_handler(server_, &cap);
         httpd_register_uri_handler(server_, &strm);
-        ESP_LOGI(TAG, "Yoda welfare web server started on port 80 (/ping /camera/on /capture /stream /camera/off)");
+        ESP_LOGI(TAG, "Jarvis welfare web server started on port 80 (/ping /camera/on /capture /stream /camera/off)");
     }
 
     // ---- Cloud relay: poll the deployed dashboard for ping/camera, push JPEG photos up ----
@@ -236,19 +236,22 @@ private:
     }
 
     void WelfareRelayLoop(const char* lan_ip) {
-        bool announced = false;  // play the privacy announce once per camera session
+        bool announced = false;     // play the privacy announce once per camera session
+        bool camera_active = false; // is the caregiver actively viewing right now?
         while (true) {
             // Only reach the cloud when she's idle — never contend with an active voice conversation
             // over the single radio/TLS stack (that contention caused the SSL -76 read errors).
+            camera_active = false;
             if (Application::GetInstance().GetDeviceState() == kDeviceStateIdle) {
                 bool ping = false, camera = false;
                 if (PollCloud(lan_ip, ping, camera)) {
                     if (ping) {
-                        std::string_view door(door_ogg_start, (size_t)(door_ogg_end - door_ogg_start));
-                        Application::GetInstance().PlaySound(door);
-                        ESP_LOGI(TAG, "relay: ping -> door announce");
+                        std::string_view checkin(checking_ogg_start, (size_t)(checking_ogg_end - checking_ogg_start));
+                        Application::GetInstance().PlaySound(checkin);
+                        ESP_LOGI(TAG, "relay: ping -> check-in announce");
                     }
                     if (camera) {
+                        camera_active = true;
                         if (!announced) {
                             std::string_view checking(checking_ogg_start, (size_t)(checking_ogg_end - checking_ogg_start));
                             Application::GetInstance().PlaySound(checking);
@@ -264,7 +267,10 @@ private:
             } else {
                 announced = false;  // a conversation interrupted; re-announce next camera session
             }
-            vTaskDelay(pdMS_TO_TICKS(2000));
+            // CRITICAL: a fresh TLS handshake every poll is CPU-heavy and starves the on-chip
+            // wake-word detector. While idle (99% of the time) poll gently so "Jarvis" always
+            // lands; only speed up while the caregiver is actively viewing the camera.
+            vTaskDelay(pdMS_TO_TICKS(camera_active ? 2000 : 15000));
         }
     }
 
@@ -280,10 +286,10 @@ private:
             }
             char ipbuf[16] = {};
             esp_ip4addr_ntoa(&ip.ip, ipbuf, sizeof(ipbuf));
-            ESP_LOGI(TAG, "=== YODA RELAY: polling cloud at %s (caregiver sees her from anywhere) ===", YODA_CLOUD_BASE);
+            ESP_LOGI(TAG, "=== JARVIS RELAY: polling cloud at %s (caregiver sees her from anywhere) ===", YODA_CLOUD_BASE);
             self->WelfareRelayLoop(ipbuf);
             vTaskDelete(nullptr);
-        }, "yoda_relay", 8192, this, 4, nullptr);
+        }, "jarvis_relay", 8192, this, 4, nullptr);
     }
 
     // httpd needs lwip/tcpip ready, which is NOT the case in the board constructor.
@@ -302,13 +308,29 @@ private:
             char ipbuf[16] = {};
             esp_ip4addr_ntoa(&ip.ip, ipbuf, sizeof(ipbuf));
             self->StartWebServer();
-            ESP_LOGI(TAG, "=== YODA WELFARE: device IP = %s  (enter this in the dashboard) ===", ipbuf);
+            ESP_LOGI(TAG, "=== JARVIS WELFARE: device IP = %s  (enter this in the dashboard) ===", ipbuf);
             vTaskDelete(nullptr);
-        }, "yoda_web_wait", 4096, this, 5, nullptr);
+        }, "jarvis_web_wait", 4096, this, 5, nullptr);
     }
 
 public:
     YodaPendant() : boot_button_(BOOT_BUTTON_GPIO) {
+        // Quiet the noisy framework tags so the serial monitor stays readable for verification.
+        // Idle relay poll (every 15s) floods with TLS/HTTP + free-sram lines; camera streaming
+        // additionally floods with AFE ringbuffer + keep-alive teardown noise. All cosmetic — the
+        // relay reports real success/failure itself under the "JarvisPendant" tag.
+        esp_log_level_set("esp-x509-crt-bundle", ESP_LOG_WARN);
+        esp_log_level_set("SystemInfo", ESP_LOG_WARN);
+        // Camera-streaming noise: the AFE mic feed overflows while the CPU is busy pushing
+        // JPEG-over-TLS (wake-word simply pauses during a caregiver-triggered camera check — not a fault).
+        esp_log_level_set("AFE", ESP_LOG_ERROR);
+        esp_log_level_set("Esp32Camera", ESP_LOG_WARN);
+        // Benign HTTPS keep-alive teardown between frame pushes (the server closes the socket after the
+        // POST already returned HTTP 200). Silence the layers that log the closed socket as an error.
+        esp_log_level_set("HttpClient", ESP_LOG_NONE);
+        esp_log_level_set("esp-tls-mbedtls", ESP_LOG_NONE);
+        esp_log_level_set("EspSsl", ESP_LOG_NONE);
+        esp_log_level_set("Dynamic Impl", ESP_LOG_NONE);
         InitializeButtons();
         InitializeCamera();
         InitializeWebServer();

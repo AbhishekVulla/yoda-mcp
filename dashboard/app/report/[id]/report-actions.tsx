@@ -9,7 +9,7 @@ import type { HealthReport } from "@/lib/db";
 function plainText(report: HealthReport, patient: string, triage: string, when: string): string {
   const h = report.paramedic_handover;
   return [
-    `YODA HEALTH HANDOVER — ${patient}`,
+    `JARVIS HEALTH HANDOVER — ${patient}`,
     `Triage: ${triage.toUpperCase()}   ·   ${when}`,
     ``,
     `SITUATION: ${report.sbar.situation}`,

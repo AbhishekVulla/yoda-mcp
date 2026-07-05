@@ -112,7 +112,7 @@ export default function CareDashboard() {
       {/* top bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-[26px] font-semibold italic tracking-tight text-ink">Yoda</span>
+          <span className="font-display text-[26px] font-semibold italic tracking-tight text-ink">Jarvis</span>
           <span className="text-[13px] font-medium uppercase tracking-[0.18em] text-faint">Care</span>
         </div>
         <div className="flex items-center gap-3">
@@ -173,7 +173,7 @@ export default function CareDashboard() {
                       <Sprout />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Yoda requested</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Jarvis requested</p>
                       <p className="mt-0.5 truncate font-display text-[17px] font-semibold leading-tight text-ink">{req.event.name}</p>
                       <p className="mt-0.5 truncate text-[13.5px] text-muted">
                         {[req.event.location, req.event.date, req.event.time].filter(Boolean).join("  ·  ")}
@@ -206,7 +206,7 @@ export default function CareDashboard() {
       {/* CONFIRMED — the activities approved & booked */}
       <section className="rise mt-9" style={{ animationDelay: "180ms" }}>
         <div className="mb-3 flex items-end justify-between">
-          <h2 className="font-display text-[22px] font-semibold tracking-tight text-ink">Arranged by Yoda</h2>
+          <h2 className="font-display text-[22px] font-semibold tracking-tight text-ink">Arranged by Jarvis</h2>
           <span className="text-[12px] font-medium uppercase tracking-[0.14em] text-faint">
             {confirmed.length} confirmed
           </span>
@@ -229,7 +229,7 @@ export default function CareDashboard() {
       </section>
 
       <p className="mt-10 text-center text-[12px] text-faint">
-        Yoda asks · {caregiverFirst} decides · Neon Postgres · refreshes every 3s
+        Jarvis asks · {caregiverFirst} decides · Neon Postgres · refreshes every 3s
       </p>
     </main>
   );

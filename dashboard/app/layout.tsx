@@ -16,8 +16,8 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Yoda · Madam Tan's Care",
-  description: "Everything Yoda has arranged for Madam Tan, at a glance.",
+  title: "Jarvis · Madam Tan's Care",
+  description: "Everything Jarvis has arranged for Madam Tan, at a glance.",
 };
 
 export default function RootLayout({

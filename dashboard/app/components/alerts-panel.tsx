@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { HealthIncident, SeniorProfile } from "@/lib/db";
 
 /* Feature 3 — health alerts surfaced at the top of the caregiver dashboard.
-   When Yoda triages a health complaint (or the senior goes silent), the incident
+   When Jarvis triages a health complaint (or the senior goes silent), the incident
    shows here, colour-graded by severity, with the relevant interRAI record inline
    so the caregiver can decide. Caregiver-facing only; the senior never sees this. */
 
@@ -107,7 +107,7 @@ export default function AlertsPanel({
                       {st.label}
                     </span>
                     {inc.effective_status === "checking" && (
-                      <span className="check-dot text-[11px] font-semibold text-faint">Yoda is checking on her…</span>
+                      <span className="check-dot text-[11px] font-semibold text-faint">Jarvis is checking on her…</span>
                     )}
                     <span className="text-[12px] text-faint">{ago(inc.started_at, now)}</span>
                   </div>
@@ -118,7 +118,7 @@ export default function AlertsPanel({
                   </p>
                   {emergency ? (
                     <p className="mt-0.5 text-[13.5px] text-danger">
-                      Yoda began a health check after “{inc.complaint}” and she went quiet. Check on her now.
+                      Jarvis began a health check after “{inc.complaint}” and she went quiet. Check on her now.
                     </p>
                   ) : (
                     symptomBits.length > 0 && (
