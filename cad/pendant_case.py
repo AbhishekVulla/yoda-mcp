@@ -19,7 +19,8 @@ import trimesh
 
 # ================= LAYOUT =================
 LAYOUT = "compact"      # "compact" (soldered) | "breadboard" (no-solder, bigger)
-BAYS = {"compact": (23.0, 33.0, 21.0), "breadboard": (49.0, 39.0, 23.0)}
+# interior W x H x D that must hold: speaker 30x20x4.2 + XIAO+cam 21x17.8x15 + amp ~17x13x6 + wiring
+BAYS = {"compact": (26.0, 36.0, 26.0), "breadboard": (49.0, 39.0, 26.0)}
 BAY_W, BAY_H, BAY_D = BAYS[LAYOUT]
 
 # ================= PARAMETERS (mm) =================
