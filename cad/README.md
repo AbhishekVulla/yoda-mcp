@@ -1,46 +1,65 @@
-# Jarvis pendant case — XIAO ESP32-S3 Sense
+# Pendant case (XIAO ESP32-S3 Sense)
 
-Parametric 3D-printed enclosure. With the speaker/amp gone, it hugs just the board + camera stack, so it's ~half the old project box. Model it once, tweak numbers, reprint.
+Parametric enclosure, printed in two parts. Every dimension is a number at the top of
+`pendant_case.py`, so a bad test fit is a one-line change and a re-run, not a CAD session.
 
 ## Files
-- `pendant_case.py` — the build123d model (all dims are parameters at the top)
-- `pendant_base.stl` / `.step` — the tub
-- `pendant_lid.stl` / `.step` — the front lid
-- `viewer.html` — interactive browser preview
-- `preview.png` — static render
 
-## Regenerate after editing parameters
-```
+`pendant_case.py` is the model. It writes `pendant_base` and `pendant_lid` as both `.stl`
+(slice these) and `.step` (edit these). `viewer.html` is a three.js preview, `preview.png`
+is a static render.
+
+## Regenerate
+
+```bash
 cd yoda-mcp
 cad/.venv/Scripts/python.exe cad/pendant_case.py
 ```
 
-## Preview in the browser
-```
+Exports are vertex-merged and watertight-checked on the way out. A non-manifold edge fails
+loudly here instead of halfway through a slicer.
+
+## Preview in a browser
+
+```bash
 cd yoda-mcp/cad
 .venv/Scripts/python.exe -m http.server 8000
-# open http://localhost:8000/viewer.html   (drag = rotate, "toggle lid" to see inside)
+# open http://localhost:8000/viewer.html
 ```
 
-## Print settings
-- PLA, 0.2 mm layers, 3 walls, ~15% infill
-- **No supports.** Print the lid flat-face-down; print the tub open-side-up.
-- 2× M2 self-tapping screws (~6–8 mm) hold the lid.
+## What it holds
 
-## Dimensions (v1, from the datasheet — expect to tune)
-- Board stack assumed **21 × 17.8 × 15 mm**, +0.8 mm clearance/side, 2 mm walls.
-- Body envelope **23.4 × 19.8 × 26.6 mm** (+ lanyard loop on top).
-- Camera hole 9 mm (centered), mic 1.8 mm beside it, USB-C slot 9.5 × 4.5 mm (bottom), lanyard 4 mm hole (top).
+Interior 26 x 36 x 26 mm, outer 30 x 31 x 40 mm. That fits the XIAO ESP32-S3 Sense stack
+(21 x 17.8 x 15), a 30 x 20 x 4.2 speaker, and a MAX98357 amp, stacked front to back.
 
-## Tuning after a test print — edit the param, re-run
-| What's wrong | Change |
+The lid closes on a mid-wall spigot lip plus two diagonal M2 screws. The lip sits in the
+middle of the wall rather than flush with the cavity, which keeps it clear of the screw
+bosses and avoids the coincident faces that produce non-manifold geometry.
+
+Camera hole is 7 mm (6 mm lens plus clearance), placed high so it clears the lanyard boss.
+Three 2 mm holes below it vent the speaker and double as the mic opening. USB-C exits the
+bottom edge.
+
+## Printing
+
+PLA, 0.2 mm layers, 3 walls, 15% infill. No supports needed: print the tub open side up and
+the lid face down. Two M2 self-tapping screws, 6 to 8 mm.
+
+## Tuning after a test fit
+
+| Symptom | Parameter |
 |---|---|
-| Board won't drop in / rattles | `CLR` |
-| Camera hole not aligned | `CAM_OFF_X` (+right) / `CAM_OFF_Z` (+up) |
-| Mic hole not aligned | `MIC_OFF_X` / `MIC_OFF_Z` |
-| USB-C won't plug / off-center | `USB_OFF_X` / `USB_OFF_Y` / `USB_W` / `USB_H` |
-| Screws too tight/loose | `SCREW_CLEAR` (lid) / `SCREW_PILOT` (boss) |
+| Board will not drop in, or rattles | `BAYS["compact"]`, `WALL` |
+| Camera hole misaligned | `CAM_OFF_X` (right is +), `CAM_OFF_Z` (up is +) |
+| USB-C will not seat | `USB_OFF_X`, `USB_OFF_Y`, `USB_W`, `USB_H` |
+| Lid too tight or too loose | `GROOVE_CLR` |
+| Screws bind | `SCREW_CLEAR`, `SCREW_PILOT` |
 
-## Known v1 simplifications (refine once the fit is confirmed)
-- No dedicated board-retention ledge — the closed lid holds the board. Add standoffs if it rattles.
-- No explicit antenna channel — the cavity has slack to tuck the flat u.FL antenna against a wall.
+`LAYOUT = "breadboard"` swaps in a larger bay if the amp is on a breadboard instead of
+soldered.
+
+## Known gaps
+
+No board-retention ledge yet, the closed lid holds the board down. No dedicated antenna
+channel either, the flat u.FL antenna tucks against an inside wall. Both are fine at this
+size and worth adding once a print confirms the fit.
