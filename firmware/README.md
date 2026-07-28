@@ -28,16 +28,60 @@ onboard PDM mic, 2.4 GHz WiFi, USB-CDC.
 
 **MAX98357A I2S amp.** Note the silk labels on the XIAO are not GPIO numbers:
 
-| Amp pin | XIAO pad | GPIO |
-|---------|----------|------|
-| BCLK | D8 | 7 |
-| LRC / WS | D9 | 8 |
-| DIN | D10 | 9 |
-| VIN | 5V | |
-| GND | GND | |
+| Amp pin | GPIO | XIAO pad | Notes |
+|---------|------|----------|-------|
+| LRC / WS | 1 | D0 | |
+| BCLK | 2 | D1 | |
+| DIN | 3 | D2 | |
+| VIN | | 3V3 | |
+| GND | | GND | must share ground with the XIAO |
+| SD | | *(see below)* | shutdown + channel select, not optional |
+| GAIN | | *(leave floating)* | floating gives the default gain |
+
+These three GPIOs are the ones the board actually drives, so they have to match however the amp is
+physically wired. If you rewire it, change `config.h` to suit, not the other way round.
+
+**The SD pin is the one that bites you.** It is not just an on/off pin, it also picks the channel, and
+the chip reads it as an analog voltage:
+
+- Near 0 V (below ~0.16 V) the amp is in **full shutdown**. I2S keeps streaming, the ESP32 logs look
+  perfect, and the speaker is completely silent. This is the classic false alarm: it looks like a
+  software bug and it is not.
+- Above roughly 1.4 V it plays the **left** channel. Mid voltages select right or a L+R mix.
+
+Most of these breakouts have a pull-up so SD floats high on its own. Do not assume it. If there is any
+doubt, jumper **SD to VIN** and the amp is forced awake on the left channel. The firmware sends the
+same mono audio on both slots (`I2S_STD_SLOT_BOTH` in `yoda_pendant_board.cc`), so whichever channel
+SD selects, there is audio in it.
+
+**Speaker wiring.** The speaker's two wires go under the screws of the green terminal. If your speaker
+came with a JST plug on the end, that plug does **not** mate with a screw terminal. Cut it off, strip
+the wires, and clamp bare copper under the screws. A plug resting against the terminal reads as
+"connected" by eye and passes no current.
 
 PDM mic is on GPIO 42 (clock) and 41 (data). Wake word is "Jarvis", the stock WakeNet
 `wn9_jarvis_tts` model. "Yoda" would need Espressif's paid custom training.
+
+### Silent speaker, healthy logs
+
+If the serial log reaches `State: speaking` and prints `<< ...` lines with no `EspUdp` or `MQTT`
+errors, the whole software path is fine: mic, ASR, LLM, TTS and audio transport all worked. That says
+nothing about which physical pins the audio is leaving on, or what happens after the amp. Work down
+this list, in order:
+
+1. **Pin map mismatch.** The three GPIOs above must match how the amp is actually wired. If they
+   don't, the chip clocks I2S out of pins with nothing attached and every log line still looks
+   perfect. Check this before touching the hardware.
+2. **SD pin** at 0 V or floating low, so the amp is shut down (see above).
+3. **Speaker not actually clamped** in the screw terminal (see above).
+4. **Ground not common** between amp and XIAO.
+5. **No power on VIN.**
+6. **Blown speaker.** A 1 W driver run at high volume dies quickly, so keep the volume low while
+   testing.
+
+A useful splitter: with the amp powered, briefly tap the `DIN` pin to 3.3 V and back. A live amp and a
+live speaker will click or pop audibly. Clicks mean the analog side is fine and the problem is
+upstream. No clicks at all means the amp is asleep, unpowered, or not connected to the speaker.
 
 ## Two ways the caregiver reaches the necklace
 

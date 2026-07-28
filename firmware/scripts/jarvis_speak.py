@@ -2,7 +2,8 @@
 """
 jarvis_speak.py -- laptop voice for the Jarvis pendant.
 
-The necklace's own speaker is dead (wrong amp / no speaker arrived), but the
+Built when the necklace's own speaker was not producing sound. It stays useful
+as a demo fallback even once on-device audio works, because the
 firmware still prints every sentence Jarvis speaks to the USB serial as
     I (12345) Application: << <what Jarvis says>
 and every user utterance as

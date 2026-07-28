@@ -13,11 +13,12 @@
 #define AUDIO_INPUT_SAMPLE_RATE  16000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
-// I2S amplifier — wired to XIAO pads D8/D9/D10 (note: silk D-labels != GPIO; D8=GPIO7, D9=GPIO8, D10=GPIO9).
-// amp BCLK->D8(GPIO7), amp LRC->D9(GPIO8), amp DIN->D10(GPIO9), VIN->5V, GND->GND.
-#define AUDIO_I2S_SPK_GPIO_BCLK  GPIO_NUM_7   // BCLK  -> pad D8
-#define AUDIO_I2S_SPK_GPIO_LRCK  GPIO_NUM_8   // LRC/WS -> pad D9
-#define AUDIO_I2S_SPK_GPIO_DOUT  GPIO_NUM_9   // DIN on the amp -> pad D10
+// I2S amplifier. Silk D-labels are not GPIO numbers: GPIO1=D0, GPIO2=D1, GPIO3=D2.
+// amp LRC->GPIO1, amp BCLK->GPIO2, amp DIN->GPIO3, VIN->3.3V, GND->GND.
+// These must match how the amp is physically wired; if you rewire, update these.
+#define AUDIO_I2S_SPK_GPIO_LRCK  GPIO_NUM_1   // LRC/WS on the amp -> GPIO1 (pad D0)
+#define AUDIO_I2S_SPK_GPIO_BCLK  GPIO_NUM_2   // BCLK on the amp   -> GPIO2 (pad D1)
+#define AUDIO_I2S_SPK_GPIO_DOUT  GPIO_NUM_3   // DIN on the amp    -> GPIO3 (pad D2)
 
 // Onboard PDM microphone (XIAO ESP32-S3 Sense daughterboard)
 #define AUDIO_I2S_MIC_GPIO_CLK   GPIO_NUM_42  // PDM clock

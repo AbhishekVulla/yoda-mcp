@@ -341,7 +341,8 @@ public:
         static NoAudioCodecSimplexPdm audio_codec(
             AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT,
-            I2S_STD_SLOT_BOTH,  // duplicate mono to L+R so the NS4168 amp hears it on either channel
+            I2S_STD_SLOT_BOTH,  // duplicate mono to L+R so the amp hears it whichever channel its
+                                // SD pin selects (MAX98357A picks L/R/mixed by SD voltage)
             AUDIO_I2S_MIC_GPIO_CLK, AUDIO_I2S_MIC_GPIO_DIN);
         return &audio_codec;
     }
